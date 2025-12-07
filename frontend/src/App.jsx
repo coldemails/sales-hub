@@ -7,6 +7,12 @@ import BulkPurchase from './pages/BulkPurchase';
 import Analytics from './pages/Analytics';
 import SetterPerformance from './pages/Setterperformance';
 import CloserManagement from './pages/CloserManagement';
+import SystemStatus from './pages/SystemStatus';
+
+// Placeholder pages for new routes
+const TeamManagement = () => <CloserManagement />;
+const PhoneNumbers = () => <ActiveNumbers />;
+const AnalyticsReports = () => <Analytics />;
 
 function App() {
   return (
@@ -15,12 +21,23 @@ function App() {
         <Route path="/" element={<Layout />}>
           <Route index element={<Dashboard />} />
           <Route path="dashboard" element={<Dashboard />} />
-          <Route path="bulk-purchase" element={<BulkPurchase />} />
-          <Route path="numbers" element={<ActiveNumbers />} />
-          <Route path="ghl" element={<GHLIntegration />} />
-          <Route path="analytics" element={<Analytics />} />
+          
+          {/* Team Management */}
+          <Route path="closers" element={<TeamManagement />} />
           <Route path="setters" element={<SetterPerformance />} />
-          <Route path="closers" element={<CloserManagement />} />
+          
+          {/* Phone Numbers */}
+          <Route path="numbers" element={<PhoneNumbers />} />
+          <Route path="bulk-purchase" element={<BulkPurchase />} />
+          
+          {/* Analytics & Reports */}
+          <Route path="analytics" element={<AnalyticsReports />} />
+          
+          {/* System Status */}
+          <Route path="system-status" element={<SystemStatus />} />
+          
+          {/* Legacy routes - keep for now */}
+          <Route path="ghl" element={<GHLIntegration />} />
         </Route>
       </Routes>
     </BrowserRouter>

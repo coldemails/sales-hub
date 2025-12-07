@@ -1,4 +1,8 @@
 {
+  "name": "sales-hub",
+  "version": "1.0.0",
+  "description": "Sales Operations Platform",
+  "private": true,
   "dependencies": {
     "@headlessui/react": "^2.2.9",
     "@heroicons/react": "^2.2.0",

@@ -67,4 +67,22 @@ export const closersApi = {
   offboardCloser: (ghlUserId) => api.delete(`/closers/offboard/${ghlUserId}`),
 };
 
+// Calendly API
+export const calendlyApi = {
+  getUser: () => api.get('/calendly/user'),
+  getOrganization: () => api.get('/calendly/organization'),
+  getEventTypes: () => api.get('/calendly/event-types'),
+  getScheduledEvents: (params = {}) => {
+    const queryParams = new URLSearchParams();
+    if (params.min_start_time) queryParams.append('min_start_time', params.min_start_time);
+    if (params.max_start_time) queryParams.append('max_start_time', params.max_start_time);
+    if (params.status) queryParams.append('status', params.status);
+    if (params.count) queryParams.append('count', params.count);
+    return api.get(`/calendly/scheduled-events?${queryParams}`);
+  },
+  getTodayEvents: () => api.get('/calendly/scheduled-events/today'),
+  getMembers: () => api.get('/calendly/members'),
+  getHealth: () => api.get('/calendly/health')
+};
+
 export default api;

@@ -19,12 +19,6 @@ import Badge from './Badge';
 export default function Layout() {
   const navItems = [
     { to: '/', icon: Activity, label: 'Dashboard', exact: true },
-    { to: '/bulk-purchase', icon: ShoppingCart, label: 'Bulk Purchase' },
-    { to: '/numbers', icon: Phone, label: 'Active Numbers' },
-    { to: '/closers', icon: Briefcase, label: 'Closer Management' },
-    { to: '/ghl', icon: Users, label: 'GHL Integration' },
-    { to: '/analytics', icon: BarChart3, label: 'Analytics' },
-    { to: '/setters', icon: Target, label: 'Setter Performance' },
   ];
 
   return (
@@ -45,18 +39,17 @@ export default function Layout() {
                 whileHover={{ rotate: 360 }}
                 transition={{ duration: 0.6 }}
               >
-                <div className="absolute inset-0 bg-gradient-to-br from-blue-400 to-teal-500 rounded-xl blur-lg opacity-30" />
-                <div className="relative bg-gradient-to-br from-blue-600 to-teal-500 p-2.5 rounded-xl shadow-lg">
+                <div className="bg-gray-900 p-2.5 rounded-xl">
                   <Phone className="h-6 w-6 text-white" strokeWidth={2.5} />
                 </div>
               </motion.div>
   
   <div>
-  <h1 className="text-xl font-display font-bold gradient-text-primary">
-    Twilio-GHL Manager
+  <h1 className="text-xl font-bold text-gray-900">
+    Sales Hub
   </h1>
-  <p className="text-xs font-body text-gray-600 font-medium">
-    Enterprise Phone Management System
+  <p className="text-xs text-gray-600 font-medium">
+    Sales Operations Platform
   </p>
 </div>
             </div>
@@ -135,10 +128,10 @@ export default function Layout() {
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
             {/* Brand */}
             <div className="flex items-center gap-3">
-              <Waves className="h-5 w-5 text-teal-500" />
+              <Waves className="h-5 w-5 text-gray-600" />
               <div>
                 <p className="text-sm font-semibold text-gray-900">
-                  Twilio-GHL Manager
+                  Sales Hub
                 </p>
                 <p className="text-xs text-gray-500">
                   © 2024 All rights reserved

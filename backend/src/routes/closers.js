@@ -1,6 +1,6 @@
 import express from 'express';
 import googleWorkspaceService from '../services/googleWorkspaceService.js';
-import calendlyService from '../services/calendlyService.js';
+import * as calendlyService from '../services/calendlyService.js';
 import zoomService from '../services/zoomService.js';
 import ghlService from '../services/ghlService.js';
 import twilioService from '../services/twilioService.js';

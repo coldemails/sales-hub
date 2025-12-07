@@ -1,10 +1,31 @@
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { motion } from 'framer-motion';
-import { numbersApi, ghlApi } from '../services/api';
-import { UserPlus, ShoppingCart, TrendingUp, ArrowRight, Clock } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Link } from 'react-router-dom';
+import { numbersApi, ghlApi, closersApi } from '../services/api';
+import { 
+  UserPlus, 
+  ShoppingCart, 
+  Users, 
+  BarChart3,
+  AlertCircle,
+  CheckCircle2,
+  Clock,
+  Phone,
+  ArrowRight,
+  Briefcase,
+  Activity,
+  Bell,
+  ChevronDown,
+  ChevronUp,
+  AlertTriangle,
+  Info
+} from 'lucide-react';
 
 export default function Dashboard() {
-  // Fetch numbers to check for recent purchases
+  const [activityExpanded, setActivityExpanded] = useState(false);
+
+  // Fetch all data
   const { data: numbersData } = useQuery({
     queryKey: ['numbers'],
     queryFn: async () => {
@@ -14,7 +35,6 @@ export default function Dashboard() {
     refetchInterval: 10000
   });
 
-  // Fetch GHL users to check for new accounts
   const { data: ghlUsersData } = useQuery({
     queryKey: ['ghl-users-dashboard'],
     queryFn: async () => {
@@ -24,26 +44,72 @@ export default function Dashboard() {
     refetchInterval: 30000
   });
 
+  const { data: closersData } = useQuery({
+    queryKey: ['closers'],
+    queryFn: async () => {
+      const response = await closersApi.getClosers();
+      return response.data;
+    },
+    refetchInterval: 30000
+  });
+
+  const { data: numbersWithGHLData } = useQuery({
+    queryKey: ['numbers-ghl-status'],
+    queryFn: async () => {
+      const response = await numbersApi.getNumbersWithGHLStatus();
+      return response.data;
+    },
+    refetchInterval: 60000
+  });
+
+  // Extract data
+  const allNumbers = numbersData?.numbers || [];
   const ghlUsers = ghlUsersData?.users || [];
-  
-  // Get NEW accounts added in last 24 hours
-  const newAccounts = ghlUsers.filter(user => {
-    if (!user.createdAt) return false;
-    const createdDate = new Date(user.createdAt);
-    const now = new Date();
-    const hoursDiff = (now - createdDate) / (1000 * 60 * 60);
-    return hoursDiff <= 24;
-  }).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-  
-  // Get recent purchases (last 24 hours)
-  const recentPurchases = (numbersData?.numbers || [])
+  const closers = closersData?.closers || [];
+  const numbersWithGHL = numbersWithGHLData?.numbers || [];
+
+  // Calculate stats
+  const closersWithNumbers = closers.filter(c => c.assignedPhoneNumber).length;
+  const setters = ghlUsers.filter(u => !u.email?.includes('@tjr-trades.com'));
+  const settersWith510 = allNumbers.filter(n => n.phoneNumber?.includes('510')).length;
+  const numbersNotInGHL = numbersWithGHL.filter(n => !n.inGHL).length;
+
+  // Recent activity (last 24 hours)
+  const recentPurchases = allNumbers
     .filter(num => {
       const purchaseDate = new Date(num.dateCreated);
       const now = new Date();
       const hoursDiff = (now - purchaseDate) / (1000 * 60 * 60);
       return hoursDiff <= 24;
     })
-    .sort((a, b) => new Date(b.dateCreated) - new Date(a.dateCreated));
+    .sort((a, b) => new Date(b.dateCreated) - new Date(a.dateCreated))
+    .slice(0, 5);
+
+  // Detect pending tasks
+  const pendingTasks = [];
+  
+  // Task: Numbers not in GHL
+  if (numbersNotInGHL > 0) {
+    pendingTasks.push({
+      id: 'ghl-sync',
+      title: `${numbersNotInGHL} number${numbersNotInGHL > 1 ? 's' : ''} need to be added to GHL`,
+      type: 'warning',
+      action: 'View Numbers',
+      link: '/numbers'
+    });
+  }
+
+  // Task: Closers without 650 numbers
+  const closersWithout650 = closers.length - closersWithNumbers;
+  if (closersWithout650 > 0) {
+    pendingTasks.push({
+      id: 'closers-no-number',
+      title: `${closersWithout650} closer${closersWithout650 > 1 ? 's' : ''} without 650 number`,
+      type: 'info',
+      action: 'Assign Numbers',
+      link: '/closers'
+    });
+  }
 
   const formatTimeAgo = (date) => {
     const now = new Date();
@@ -62,229 +128,383 @@ export default function Dashboard() {
       {/* Header */}
       <div>
         <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Dashboard</h1>
-        <p className="text-gray-600 mt-1">Monitor your Twilio-GHL system activity</p>
+        <p className="text-gray-600 mt-1">Monitor your sales operations activity</p>
       </div>
 
-      {/* Stats Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Total Users */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4 }}
-          className="bg-white rounded-xl border border-gray-200 p-6 hover:shadow-lg transition-shadow"
-        >
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">New Accounts Today</p>
-              <p className="text-3xl font-bold text-gray-900 mt-2">{newAccounts.length}</p>
-              <div className="flex items-center gap-1 mt-2">
-                <span className="text-sm font-medium text-gray-500">
-                  Total: {ghlUsers.length}
-                </span>
-              </div>
+      {/* Quick Actions - 3 CARDS */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4 }}
+      >
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">Quick Actions</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Onboard Closer Card */}
+          <Link
+            to="/closers"
+            className="group relative bg-white rounded-2xl border-2 border-gray-200 p-10 hover:border-gray-900 hover:shadow-xl transition-all duration-300"
+          >
+            <div className="absolute top-8 right-8">
+              <ArrowRight className="h-6 w-6 text-gray-400 group-hover:text-gray-900 group-hover:translate-x-1 transition-all" />
             </div>
-            <div className="h-12 w-12 rounded-full bg-blue-50 flex items-center justify-center">
-              <UserPlus className="h-6 w-6 text-blue-600" />
+            <div className="h-16 w-16 rounded-2xl bg-gray-900 flex items-center justify-center mb-8 group-hover:scale-110 transition-transform">
+              <UserPlus className="h-8 w-8 text-white" />
+            </div>
+            <h3 className="text-xl font-bold text-gray-900 mb-2">Onboard Closer</h3>
+            <p className="text-gray-600">Add new closer to your team</p>
+          </Link>
+
+          {/* Assign Numbers Card */}
+          <Link
+            to="/bulk-purchase"
+            className="group relative bg-white rounded-2xl border-2 border-gray-200 p-10 hover:border-gray-900 hover:shadow-xl transition-all duration-300"
+          >
+            <div className="absolute top-8 right-8">
+              <ArrowRight className="h-6 w-6 text-gray-400 group-hover:text-gray-900 group-hover:translate-x-1 transition-all" />
+            </div>
+            <div className="h-16 w-16 rounded-2xl bg-gray-900 flex items-center justify-center mb-8 group-hover:scale-110 transition-transform">
+              <ShoppingCart className="h-8 w-8 text-white" />
+            </div>
+            <h3 className="text-xl font-bold text-gray-900 mb-2">Assign Numbers</h3>
+            <p className="text-gray-600">Assign numbers to setters</p>
+          </Link>
+
+          {/* Activity Monitor Card - ACCORDION */}
+          <div className="md:col-span-2">
+            <div
+              onClick={() => setActivityExpanded(!activityExpanded)}
+              className="group relative bg-white rounded-2xl border-2 border-gray-200 p-10 hover:border-gray-900 hover:shadow-xl transition-all duration-300 cursor-pointer"
+            >
+              <div className="absolute top-8 right-8">
+                {activityExpanded ? (
+                  <ChevronUp className="h-6 w-6 text-gray-900" />
+                ) : (
+                  <ChevronDown className="h-6 w-6 text-gray-400 group-hover:text-gray-900 transition-all" />
+                )}
+              </div>
+              <div className="flex items-start gap-6">
+                <div className="h-16 w-16 rounded-2xl bg-gray-900 flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform">
+                  <Bell className="h-8 w-8 text-white" />
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center gap-3 mb-2">
+                    <h3 className="text-xl font-bold text-gray-900">Activity Monitor</h3>
+                    <span className="px-3 py-1 bg-red-100 text-red-700 text-sm font-semibold rounded-full">
+                      3 alerts
+                    </span>
+                  </div>
+                  <p className="text-gray-600">Track system changes & critical alerts</p>
+                </div>
+              </div>
+
+              {/* Expanded Content */}
+              <AnimatePresence>
+                {activityExpanded && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.3 }}
+                    className="mt-8 pt-8 border-t border-gray-200"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {/* Critical Alerts */}
+                    <div className="mb-6">
+                      <div className="flex items-center gap-2 mb-4">
+                        <AlertTriangle className="h-5 w-5 text-red-600" />
+                        <h4 className="font-bold text-gray-900">Critical Alerts</h4>
+                      </div>
+                      <div className="space-y-3">
+                        <div className="flex items-start gap-3 p-4 bg-red-50 rounded-lg border border-red-200">
+                          <div className="h-2 w-2 rounded-full bg-red-500 mt-2 flex-shrink-0"></div>
+                          <div className="flex-1">
+                            <p className="font-semibold text-gray-900">Calendly event missing Zoom location</p>
+                            <p className="text-sm text-gray-600 mt-1">"Setter Call" event has no meeting location set</p>
+                          </div>
+                          <Link
+                            to="/system-status"
+                            className="text-sm text-red-700 hover:text-red-900 font-medium whitespace-nowrap"
+                          >
+                            Fix now →
+                          </Link>
+                        </div>
+
+                        <div className="flex items-start gap-3 p-4 bg-red-50 rounded-lg border border-red-200">
+                          <div className="h-2 w-2 rounded-full bg-red-500 mt-2 flex-shrink-0"></div>
+                          <div className="flex-1">
+                            <p className="font-semibold text-gray-900">GHL automation conflict detected</p>
+                            <p className="text-sm text-gray-600 mt-1">2 automations editing the same field</p>
+                          </div>
+                          <Link
+                            to="/system-status"
+                            className="text-sm text-red-700 hover:text-red-900 font-medium whitespace-nowrap"
+                          >
+                            Review →
+                          </Link>
+                        </div>
+
+                        <div className="flex items-start gap-3 p-4 bg-amber-50 rounded-lg border border-amber-200">
+                          <div className="h-2 w-2 rounded-full bg-amber-500 mt-2 flex-shrink-0"></div>
+                          <div className="flex-1">
+                            <p className="font-semibold text-gray-900">5 closers idle for 4+ hours</p>
+                            <p className="text-sm text-gray-600 mt-1">Might need call assignments</p>
+                          </div>
+                          <Link
+                            to="/closers"
+                            className="text-sm text-amber-700 hover:text-amber-900 font-medium whitespace-nowrap"
+                          >
+                            View →
+                          </Link>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Recent Changes */}
+                    <div>
+                      <div className="flex items-center gap-2 mb-4">
+                        <Info className="h-5 w-5 text-gray-600" />
+                        <h4 className="font-bold text-gray-900">Recent Changes (24h)</h4>
+                      </div>
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                          <div className="h-2 w-2 rounded-full bg-green-500 flex-shrink-0"></div>
+                          <p className="text-sm text-gray-900 flex-1">New account added: john@tjr-trades.com</p>
+                          <span className="text-xs text-gray-500">2h ago</span>
+                        </div>
+                        <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                          <div className="h-2 w-2 rounded-full bg-green-500 flex-shrink-0"></div>
+                          <p className="text-sm text-gray-900 flex-1">Number assigned: +1(650)555-1234 → Sarah</p>
+                          <span className="text-xs text-gray-500">3h ago</span>
+                        </div>
+                        <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                          <div className="h-2 w-2 rounded-full bg-blue-500 flex-shrink-0"></div>
+                          <p className="text-sm text-gray-900 flex-1">GHL automation created: "Lead Follow-up"</p>
+                          <span className="text-xs text-gray-500">5h ago</span>
+                        </div>
+                        <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                          <div className="h-2 w-2 rounded-full bg-blue-500 flex-shrink-0"></div>
+                          <p className="text-sm text-gray-900 flex-1">Calendly event modified: "Paid Ads Call"</p>
+                          <span className="text-xs text-gray-500">6h ago</span>
+                        </div>
+                      </div>
+                      <div className="mt-4 text-center">
+                        <Link
+                          to="/system-status"
+                          className="text-sm text-gray-700 hover:text-gray-900 font-medium inline-flex items-center gap-1"
+                        >
+                          View All Activity
+                          <ArrowRight className="h-3 w-3" />
+                        </Link>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
           </div>
-        </motion.div>
+        </div>
+      </motion.div>
 
-        {/* Numbers Purchased */}
+      {/* Pending Tasks */}
+      {pendingTasks.length > 0 && (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, delay: 0.1 }}
-          className="bg-white rounded-xl border border-gray-200 p-6 hover:shadow-lg transition-shadow"
+          className="bg-amber-50 border border-amber-200 rounded-xl p-6"
         >
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Purchased in 24h</p>
-              <p className="text-3xl font-bold text-gray-900 mt-2">{recentPurchases.length}</p>
-              <div className="flex items-center gap-1 mt-2">
-                <span className="text-sm font-medium text-gray-500">
-                  Total: {numbersData?.count || 0}
-                </span>
-              </div>
-            </div>
-            <div className="h-12 w-12 rounded-full bg-green-50 flex items-center justify-center">
-              <ShoppingCart className="h-6 w-6 text-green-600" />
-            </div>
+          <div className="flex items-center gap-2 mb-4">
+            <AlertCircle className="h-5 w-5 text-amber-600" />
+            <h2 className="text-lg font-semibold text-gray-900">Pending Tasks ({pendingTasks.length})</h2>
           </div>
-        </motion.div>
-
-        {/* Activity Status */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, delay: 0.2 }}
-          className="bg-white rounded-xl border border-gray-200 p-6 hover:shadow-lg transition-shadow"
-        >
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">System Status</p>
-              <p className="text-3xl font-bold text-green-600 mt-2">Active</p>
-              <div className="flex items-center gap-1 mt-2">
-                <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse"></div>
-                <span className="text-sm font-medium text-gray-600">
-                  Auto-syncing
-                </span>
-              </div>
-            </div>
-            <div className="h-12 w-12 rounded-full bg-green-50 flex items-center justify-center">
-              <Clock className="h-6 w-6 text-green-600" />
-            </div>
-          </div>
-        </motion.div>
-      </div>
-
-      {/* Activity Feed */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        
-        {/* New Accounts Feed */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, delay: 0.3 }}
-          className="bg-white rounded-xl border border-gray-200 overflow-hidden"
-        >
-          <div className="px-6 py-4 border-b border-gray-100">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900">New Accounts</h3>
-                <p className="text-sm text-gray-600 mt-0.5">Added in last 24 hours</p>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-2xl font-bold text-gray-900">{newAccounts.length}</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="p-6">
-            {newAccounts.length > 0 ? (
-              <div className="space-y-3">
-                {newAccounts.map((user, index) => {
-                  const userName = user.name || `${user.firstName || ''} ${user.lastName || ''}`.trim();
-                  const timeAgo = formatTimeAgo(user.createdAt);
-                  
-                  return (
-                    <motion.div
-                      key={user.id || index}
-                      initial={{ opacity: 0, x: -20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: index * 0.05 }}
-                      className="flex items-center justify-between p-3 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="h-10 w-10 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white font-semibold text-sm">
-                          {userName.charAt(0).toUpperCase()}
-                        </div>
-                        <div>
-                          <p className="font-medium text-gray-900">{userName}</p>
-                          <p className="text-sm text-gray-600">{user.email || 'No email'}</p>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-sm font-medium text-gray-900">{timeAgo}</p>
-                      </div>
-                    </motion.div>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="text-center py-8">
-                <div className="h-12 w-12 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-3">
-                  <UserPlus className="h-6 w-6 text-gray-400" />
+          <div className="space-y-3">
+            {pendingTasks.map((task) => (
+              <div
+                key={task.id}
+                className="flex items-center justify-between p-4 bg-white rounded-lg border border-amber-200"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="h-2 w-2 rounded-full bg-amber-500"></div>
+                  <p className="text-gray-900 font-medium">{task.title}</p>
                 </div>
-                <p className="text-gray-600 font-medium">No new accounts</p>
-                <p className="text-sm text-gray-500 mt-1">Check back later</p>
-              </div>
-            )}
-
-            {newAccounts.length > 0 && (
-              <div className="mt-6 pt-4 border-t border-gray-100">
-                <a 
-                  href="/bulk-purchase"
-                  className="flex items-center justify-center gap-2 w-full px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors"
+                <Link
+                  to={task.link}
+                  className="px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 transition-colors flex items-center gap-2"
                 >
-                  <span>Assign Numbers</span>
+                  {task.action}
                   <ArrowRight className="h-4 w-4" />
-                </a>
+                </Link>
               </div>
-            )}
+            ))}
           </div>
         </motion.div>
+      )}
 
-        {/* Recent Purchases Feed */}
+      {/* No Pending Tasks */}
+      {pendingTasks.length === 0 && (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, delay: 0.4 }}
-          className="bg-white rounded-xl border border-gray-200 overflow-hidden"
+          transition={{ duration: 0.4, delay: 0.1 }}
+          className="bg-green-50 border border-green-200 rounded-xl p-6"
         >
-          <div className="px-6 py-4 border-b border-gray-100">
+          <div className="flex items-center gap-3">
+            <CheckCircle2 className="h-6 w-6 text-green-600" />
+            <div>
+              <p className="font-semibold text-gray-900">All Caught Up!</p>
+              <p className="text-sm text-gray-600">No pending tasks at the moment</p>
+            </div>
+          </div>
+        </motion.div>
+      )}
+
+      {/* Team Status */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, delay: 0.2 }}
+        className="bg-white rounded-xl border border-gray-200 p-6"
+      >
+        <h2 className="text-lg font-semibold text-gray-900 mb-4">Team Status</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Closers */}
+          <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900">Recent Purchases</h3>
-                <p className="text-sm text-gray-600 mt-0.5">Numbers purchased in 24h</p>
-              </div>
               <div className="flex items-center gap-2">
-                <span className="text-2xl font-bold text-gray-900">{recentPurchases.length}</span>
+                <Briefcase className="h-5 w-5 text-gray-600" />
+                <p className="font-medium text-gray-900">Closers</p>
+              </div>
+              <Link to="/closers" className="text-sm text-gray-600 hover:text-gray-900 flex items-center gap-1">
+                View All
+                <ArrowRight className="h-3 w-3" />
+              </Link>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="p-4 bg-gray-50 rounded-lg">
+                <p className="text-2xl font-bold text-gray-900">{closers.length}</p>
+                <p className="text-sm text-gray-600">Active closers</p>
+              </div>
+              <div className="p-4 bg-gray-50 rounded-lg">
+                <p className="text-2xl font-bold text-gray-900">{closersWithNumbers}</p>
+                <p className="text-sm text-gray-600">With 650 numbers</p>
               </div>
             </div>
           </div>
 
-          <div className="p-6">
-            {recentPurchases.length > 0 ? (
-              <div className="space-y-3">
-                {recentPurchases.slice(0, 8).map((number, index) => {
-                  const timeAgo = formatTimeAgo(number.dateCreated);
-                  
-                  return (
-                    <motion.div
-                      key={number.sid}
-                      initial={{ opacity: 0, x: -20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: index * 0.05 }}
-                      className="flex items-center justify-between p-3 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="h-10 w-10 rounded-full bg-gradient-to-br from-green-500 to-green-600 flex items-center justify-center">
-                          <ShoppingCart className="h-5 w-5 text-white" />
-                        </div>
-                        <div>
-                          <p className="font-mono font-semibold text-gray-900">{number.phoneNumber}</p>
-                          <p className="text-sm text-gray-600">{number.friendlyName || 'No name assigned'}</p>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-sm font-medium text-gray-900">{timeAgo}</p>
-                      </div>
-                    </motion.div>
-                  );
-                })}
+          {/* Setters */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Phone className="h-5 w-5 text-gray-600" />
+                <p className="font-medium text-gray-900">Setters</p>
               </div>
-            ) : (
-              <div className="text-center py-8">
-                <div className="h-12 w-12 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-3">
-                  <ShoppingCart className="h-6 w-6 text-gray-400" />
-                </div>
-                <p className="text-gray-600 font-medium">No recent purchases</p>
-                <p className="text-sm text-gray-500 mt-1">Start by purchasing numbers</p>
+              <Link to="/setters" className="text-sm text-gray-600 hover:text-gray-900 flex items-center gap-1">
+                View Performance
+                <ArrowRight className="h-3 w-3" />
+              </Link>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="p-4 bg-gray-50 rounded-lg">
+                <p className="text-2xl font-bold text-gray-900">{setters.length}</p>
+                <p className="text-sm text-gray-600">Active setters</p>
               </div>
-            )}
-
-            {recentPurchases.length > 8 && (
-              <div className="mt-4 text-center">
-                <p className="text-sm text-gray-600">
-                  +{recentPurchases.length - 8} more purchases
-                </p>
+              <div className="p-4 bg-gray-50 rounded-lg">
+                <p className="text-2xl font-bold text-gray-900">{settersWith510}</p>
+                <p className="text-sm text-gray-600">With 510 numbers</p>
               </div>
-            )}
+            </div>
           </div>
-        </motion.div>
+        </div>
+      </motion.div>
 
-      </div>
+      {/* Recent Activity - CHANGED TO TEAM ACTIONS */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, delay: 0.3 }}
+        className="bg-white rounded-xl border border-gray-200 overflow-hidden"
+      >
+        <div className="px-6 py-4 border-b border-gray-100">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Activity className="h-5 w-5 text-gray-600" />
+              <h2 className="text-lg font-semibold text-gray-900">Recent Team Activity</h2>
+            </div>
+            <p className="text-sm text-gray-600">Last 24 hours</p>
+          </div>
+        </div>
+
+        <div className="p-6">
+          {closers.length > 0 ? (
+            <div className="space-y-3">
+              {/* Show recently added closers */}
+              {closers.slice(0, 5).map((closer, index) => {
+                const hasNumber = closer.assignedPhoneNumber;
+                
+                return (
+                  <motion.div
+                    key={closer.id}
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: index * 0.05 }}
+                    className="flex items-center justify-between p-4 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="h-10 w-10 rounded-full bg-gray-900 flex items-center justify-center text-white font-semibold">
+                        {closer.firstName?.charAt(0) || 'C'}
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <p className="font-semibold text-gray-900">
+                            {closer.firstName} {closer.lastName}
+                          </p>
+                          {hasNumber ? (
+                            <span className="px-2 py-0.5 bg-green-100 text-green-700 text-xs font-medium rounded">
+                              Active
+                            </span>
+                          ) : (
+                            <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-xs font-medium rounded">
+                              Setup Pending
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-sm text-gray-600">{closer.email}</p>
+                      </div>
+                    </div>
+                    <Link
+                      to="/closers"
+                      className="text-sm text-gray-600 hover:text-gray-900 flex items-center gap-1"
+                    >
+                      View
+                      <ArrowRight className="h-3 w-3" />
+                    </Link>
+                  </motion.div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="text-center py-8">
+              <div className="h-12 w-12 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-3">
+                <Users className="h-6 w-6 text-gray-400" />
+              </div>
+              <p className="text-gray-600 font-medium">No team members yet</p>
+              <p className="text-sm text-gray-500 mt-1">Start by onboarding your first closer</p>
+            </div>
+          )}
+
+          {closers.length > 5 && (
+            <div className="mt-6 pt-4 border-t border-gray-100">
+              <Link
+                to="/closers"
+                className="flex items-center justify-center gap-2 w-full px-4 py-2.5 text-gray-700 hover:text-gray-900 font-medium rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                <span>View All Team Members</span>
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+            </div>
+          )}
+        </div>
+      </motion.div>
     </div>
   );
 }
