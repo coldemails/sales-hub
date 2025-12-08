@@ -82,6 +82,7 @@ export const calendlyApi = {
     return api.get(`/calendly/scheduled-events?${queryParams}`);
   },
   getTodayEvents: () => api.get('/calendly/scheduled-events/today'),
+  getEventTypeDetails: (uri) => api.get(`/calendly/event-type-details?uri=${encodeURIComponent(uri)}`),
   getMembers: () => api.get('/calendly/members'),
   getHealth: () => api.get('/calendly/health')
 };

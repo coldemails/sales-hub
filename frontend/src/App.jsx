@@ -7,8 +7,9 @@ import BulkPurchase from './pages/BulkPurchase';
 import Analytics from './pages/Analytics';
 import SetterPerformance from './pages/Setterperformance';
 import CloserManagement from './pages/CloserManagement';
-import SystemStatus from './pages/SystemStatus';
+import SystemStatus from './pages/Systemstatus';
 import CloserOnboarding from './pages/CloserOnboarding';
+import CallsManagement from './pages/CallsManagement';
 
 // Placeholder pages for new routes
 const TeamManagement = () => <CloserManagement />;
@@ -33,16 +34,17 @@ function App() {
           
           {/* Analytics & Reports */}
           <Route path="analytics" element={<AnalyticsReports />} />
+          <Route path="calls-analytics" element={<CallsManagement />} />
           
           {/* System Status */}
           <Route path="system-status" element={<SystemStatus />} />
           
           {/* Legacy routes - keep for now */}
           <Route path="ghl" element={<GHLIntegration />} />
-
-          {/* Public Onboarding Page */}
-          <Route path="/onboard" element={<CloserOnboarding />} />
         </Route>
+
+        {/* Public Onboarding Page */}
+        <Route path="/onboard" element={<CloserOnboarding />} />
       </Routes>
     </BrowserRouter>
   );

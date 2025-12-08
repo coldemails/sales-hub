@@ -7,10 +7,8 @@ import {
   UserPlus, 
   ShoppingCart, 
   Users, 
-  BarChart3,
   AlertCircle,
   CheckCircle2,
-  Clock,
   Phone,
   ArrowRight,
   Briefcase,
@@ -19,7 +17,8 @@ import {
   ChevronDown,
   ChevronUp,
   AlertTriangle,
-  Info
+  Info,
+  Calendar
 } from 'lucide-react';
 
 export default function Dashboard() {
@@ -169,6 +168,21 @@ export default function Dashboard() {
             <p className="text-gray-600">Assign numbers to setters</p>
           </Link>
 
+          {/* Calls Analytics Card - LINK TO NEW PAGE */}
+          <Link
+            to="/calls-analytics"
+            className="group relative bg-white rounded-2xl border-2 border-gray-200 p-10 hover:border-gray-900 hover:shadow-xl transition-all duration-300"
+          >
+            <div className="absolute top-8 right-8">
+              <ArrowRight className="h-6 w-6 text-gray-400 group-hover:text-gray-900 group-hover:translate-x-1 transition-all" />
+            </div>
+            <div className="h-16 w-16 rounded-2xl bg-gray-900 flex items-center justify-center mb-8 group-hover:scale-110 transition-transform">
+              <Calendar className="h-8 w-8 text-white" />
+            </div>
+            <h3 className="text-xl font-bold text-gray-900 mb-2">Calls Analytics</h3>
+            <p className="text-gray-600">View today's scheduled calls & capacity</p>
+          </Link>
+
           {/* Activity Monitor Card - ACCORDION */}
           <div className="md:col-span-2">
             <div
@@ -201,101 +215,71 @@ export default function Dashboard() {
               <AnimatePresence>
                 {activityExpanded && (
                   <motion.div
-                    initial={{ height: 0, opacity: 0 }}
-                    animate={{ height: 'auto', opacity: 1 }}
-                    exit={{ height: 0, opacity: 0 }}
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
                     transition={{ duration: 0.3 }}
                     className="mt-8 pt-8 border-t border-gray-200"
-                    onClick={(e) => e.stopPropagation()}
                   >
-                    {/* Critical Alerts */}
-                    <div className="mb-6">
-                      <div className="flex items-center gap-2 mb-4">
-                        <AlertTriangle className="h-5 w-5 text-red-600" />
-                        <h4 className="font-bold text-gray-900">Critical Alerts</h4>
-                      </div>
-                      <div className="space-y-3">
-                        <div className="flex items-start gap-3 p-4 bg-red-50 rounded-lg border border-red-200">
-                          <div className="h-2 w-2 rounded-full bg-red-500 mt-2 flex-shrink-0"></div>
+                    <div className="space-y-3">
+                      {/* Alert 1: Numbers not in GHL */}
+                      {numbersNotInGHL > 0 && (
+                        <div className="flex items-start gap-3 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                          <AlertTriangle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
                           <div className="flex-1">
-                            <p className="font-semibold text-gray-900">Calendly event missing Zoom location</p>
-                            <p className="text-sm text-gray-600 mt-1">"Setter Call" event has no meeting location set</p>
+                            <p className="text-sm font-semibold text-amber-900">
+                              {numbersNotInGHL} Twilio number{numbersNotInGHL > 1 ? 's' : ''} not synced to GHL
+                            </p>
+                            <p className="text-xs text-amber-700 mt-1">
+                              These numbers need to be added to your GHL phone numbers
+                            </p>
                           </div>
                           <Link
-                            to="/system-status"
-                            className="text-sm text-red-700 hover:text-red-900 font-medium whitespace-nowrap"
+                            to="/numbers"
+                            className="text-xs font-medium text-amber-700 hover:text-amber-900 flex items-center gap-1"
                           >
-                            Fix now →
+                            Fix Now
+                            <ArrowRight className="h-3 w-3" />
                           </Link>
                         </div>
+                      )}
 
-                        <div className="flex items-start gap-3 p-4 bg-red-50 rounded-lg border border-red-200">
-                          <div className="h-2 w-2 rounded-full bg-red-500 mt-2 flex-shrink-0"></div>
+                      {/* Alert 2: Recent purchases */}
+                      {recentPurchases.length > 0 && (
+                        <div className="flex items-start gap-3 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                          <Info className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
                           <div className="flex-1">
-                            <p className="font-semibold text-gray-900">GHL automation conflict detected</p>
-                            <p className="text-sm text-gray-600 mt-1">2 automations editing the same field</p>
+                            <p className="text-sm font-semibold text-blue-900">
+                              {recentPurchases.length} number{recentPurchases.length > 1 ? 's' : ''} purchased in the last 24h
+                            </p>
+                            <p className="text-xs text-blue-700 mt-1">
+                              Latest: {recentPurchases[0]?.phoneNumber} ({formatTimeAgo(recentPurchases[0]?.dateCreated)})
+                            </p>
                           </div>
-                          <Link
-                            to="/system-status"
-                            className="text-sm text-red-700 hover:text-red-900 font-medium whitespace-nowrap"
-                          >
-                            Review →
-                          </Link>
                         </div>
+                      )}
 
-                        <div className="flex items-start gap-3 p-4 bg-amber-50 rounded-lg border border-amber-200">
-                          <div className="h-2 w-2 rounded-full bg-amber-500 mt-2 flex-shrink-0"></div>
+                      {/* Alert 3: Closers without numbers */}
+                      {closersWithout650 > 0 && (
+                        <div className="flex items-start gap-3 p-4 bg-gray-50 border border-gray-200 rounded-lg">
+                          <Info className="h-5 w-5 text-gray-600 flex-shrink-0 mt-0.5" />
                           <div className="flex-1">
-                            <p className="font-semibold text-gray-900">5 closers idle for 4+ hours</p>
-                            <p className="text-sm text-gray-600 mt-1">Might need call assignments</p>
+                            <p className="text-sm font-semibold text-gray-900">
+                              {closersWithout650} closer{closersWithout650 > 1 ? 's' : ''} without 650 number
+                            </p>
+                            <p className="text-xs text-gray-600 mt-1">
+                              Assign phone numbers to complete their setup
+                            </p>
                           </div>
                           <Link
                             to="/closers"
-                            className="text-sm text-amber-700 hover:text-amber-900 font-medium whitespace-nowrap"
+                            className="text-xs font-medium text-gray-700 hover:text-gray-900 flex items-center gap-1"
                           >
-                            View →
+                            View
+                            <ArrowRight className="h-3 w-3" />
                           </Link>
                         </div>
-                      </div>
-                    </div>
-
-                    {/* Recent Changes */}
-                    <div>
-                      <div className="flex items-center gap-2 mb-4">
-                        <Info className="h-5 w-5 text-gray-600" />
-                        <h4 className="font-bold text-gray-900">Recent Changes (24h)</h4>
-                      </div>
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                          <div className="h-2 w-2 rounded-full bg-green-500 flex-shrink-0"></div>
-                          <p className="text-sm text-gray-900 flex-1">New account added: john@tjr-trades.com</p>
-                          <span className="text-xs text-gray-500">2h ago</span>
-                        </div>
-                        <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                          <div className="h-2 w-2 rounded-full bg-green-500 flex-shrink-0"></div>
-                          <p className="text-sm text-gray-900 flex-1">Number assigned: +1(650)555-1234 → Sarah</p>
-                          <span className="text-xs text-gray-500">3h ago</span>
-                        </div>
-                        <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                          <div className="h-2 w-2 rounded-full bg-blue-500 flex-shrink-0"></div>
-                          <p className="text-sm text-gray-900 flex-1">GHL automation created: "Lead Follow-up"</p>
-                          <span className="text-xs text-gray-500">5h ago</span>
-                        </div>
-                        <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                          <div className="h-2 w-2 rounded-full bg-blue-500 flex-shrink-0"></div>
-                          <p className="text-sm text-gray-900 flex-1">Calendly event modified: "Paid Ads Call"</p>
-                          <span className="text-xs text-gray-500">6h ago</span>
-                        </div>
-                      </div>
-                      <div className="mt-4 text-center">
-                        <Link
-                          to="/system-status"
-                          className="text-sm text-gray-700 hover:text-gray-900 font-medium inline-flex items-center gap-1"
-                        >
-                          View All Activity
-                          <ArrowRight className="h-3 w-3" />
-                        </Link>
-                      </div>
+                      )}
                     </div>
                   </motion.div>
                 )}

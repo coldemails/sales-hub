@@ -98,6 +98,20 @@ export async function getInvitee(inviteeUri) {
   }
 }
 
+// Get event type details (includes scheduling_url)
+export async function getEventTypeDetails(eventTypeUri) {
+  try {
+    console.log(`[Calendly] Fetching event type details: ${eventTypeUri}`);
+    const cleanUri = eventTypeUri.replace('https://api.calendly.com', '');
+    const response = await calendlyClient.get(cleanUri);
+    console.log(`[Calendly] ✅ Event type details fetched: ${response.data.resource.name}`);
+    return response.data.resource;
+  } catch (error) {
+    console.error('[Calendly] Error fetching event type details:', error.response?.data || error.message);
+    throw error;
+  }
+}
+
 // Get organization members (your team)
 export async function getOrganizationMembers() {
   try {
