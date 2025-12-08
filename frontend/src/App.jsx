@@ -7,7 +7,7 @@ import BulkPurchase from './pages/BulkPurchase';
 import Analytics from './pages/Analytics';
 import SetterPerformance from './pages/Setterperformance';
 import CloserManagement from './pages/CloserManagement';
-import SystemStatus from './pages/SystemStatus';
+import SystemStatus from './pages/Systemstatus';
 import CloserOnboarding from './pages/CloserOnboarding';
 
 // Placeholder pages for new routes
