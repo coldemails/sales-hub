@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { analyticsApi } from '../services/api';
-import LoadingBanner from '../components/LoadingBanner';
+import LoadingBanner from '../components/Loadingbanner';
 import { StatCard } from '../components/Card';
 import { 
   Users,
