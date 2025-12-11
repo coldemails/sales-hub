@@ -78,17 +78,56 @@ async function getUserByEmail(email) {
     const response = await admin.users.get({
       userKey: email
     });
-    
-    console.log(`[Google Workspace] ✅ Found user: ${email}`);
+
     return response.data;
   } catch (error) {
-    if (error.code === 404) {
+    if (error.code === 404 || error.response?.status === 404) {
       console.log(`[Google Workspace] User not found: ${email}`);
       return null;
     }
     console.error('[Google Workspace] Error fetching user:', error.message);
     throw error;
   }
+}
+
+// Check if email exists
+async function emailExists(email) {
+  try {
+    const user = await getUserByEmail(email);
+    return user !== null;
+  } catch (error) {
+    return false;
+  }
+}
+
+// Generate unique email using format: firstname-lastnameInitial@tjr-trades.com
+async function generateUniqueEmail(firstName, lastName) {
+  const domain = 'tjr-trades.com';
+  const baseEmail = `${firstName.toLowerCase()}-${lastName.charAt(0).toLowerCase()}@${domain}`;
+  
+  console.log(`[Google Workspace] Checking availability for: ${baseEmail}`);
+  
+  // Check if base email is available
+  const baseExists = await emailExists(baseEmail);
+  if (!baseExists) {
+    console.log(`[Google Workspace] ✅ Email available: ${baseEmail}`);
+    return baseEmail;
+  }
+  
+  // If taken, try with numbers: firstname-lastnameInitial2@domain, firstname-lastnameInitial3@domain, etc.
+  console.log(`[Google Workspace] Base email taken, trying numbered variants...`);
+  for (let i = 2; i <= 20; i++) {
+    const numberedEmail = `${firstName.toLowerCase()}-${lastName.charAt(0).toLowerCase()}${i}@${domain}`;
+    const exists = await emailExists(numberedEmail);
+    
+    if (!exists) {
+      console.log(`[Google Workspace] ✅ Email available: ${numberedEmail}`);
+      return numberedEmail;
+    }
+  }
+  
+  // If all numbered variants are taken (unlikely), throw error
+  throw new Error(`Unable to generate unique email for ${firstName} ${lastName} - all variants taken`);
 }
 
 // Create user
@@ -194,7 +233,9 @@ function generateRandomPassword(length = 16) {
 
 // For backwards compatibility with old code
 class GoogleWorkspaceService {
-  async createAccount(firstName, lastName, email, password = null) {
+  async createAccount(firstName, lastName, emailOrNull = null, password = null) {
+    // If no email provided, generate unique one
+    const email = emailOrNull || await generateUniqueEmail(firstName, lastName);
     return await createUser(firstName, lastName, email, password);
   }
 
@@ -205,7 +246,17 @@ class GoogleWorkspaceService {
   async getAccount(email) {
     return await getUserByEmail(email);
   }
+
+  // New method to check email availability
+  async checkEmailAvailable(email) {
+    return !(await emailExists(email));
+  }
+
+  // New method to generate unique email
+  async generateEmail(firstName, lastName) {
+    return await generateUniqueEmail(firstName, lastName);
+  }
 }
 
 export default new GoogleWorkspaceService();
-export { getUserByEmail, createUser, deleteUser, suspendUser, listUsers };
+export { getUserByEmail, createUser, deleteUser, suspendUser, listUsers, emailExists, generateUniqueEmail };

@@ -10,11 +10,12 @@ import {
   Calendar,
   Briefcase,
   Phone,
-  Check
+  Check,
+  AlertCircle
 } from 'lucide-react';
 
 export default function CloserOnboarding() {
-  const [currentStep, setCurrentStep] = useState(1);
+  const [currentStep, setCurrentStep] = useState(0); // Start at 0 for instructions
   const [isProcessing, setIsProcessing] = useState(false);
   const [isSendingInvite, setIsSendingInvite] = useState(false);
   const [inviteSent, setInviteSent] = useState(false);
@@ -29,7 +30,7 @@ export default function CloserOnboarding() {
   });
   const [twilioNumber, setTwilioNumber] = useState('');
 
-  const totalSteps = 5;
+  const totalSteps = 6; // Now 6 steps (0=instructions, 1-5=original steps)
 
   const handleInputChange = (e) => {
     setFormData({
@@ -50,7 +51,7 @@ export default function CloserOnboarding() {
         password: 'TempPassword123!'
       });
       setIsProcessing(false);
-      setCurrentStep(2);
+      setCurrentStep(2); // Was 2, now goes to step 2
     }, 2000);
   };
 
@@ -89,12 +90,12 @@ export default function CloserOnboarding() {
   };
 
   const handleContinueToCalendly = () => {
-    setCurrentStep(4);
+    setCurrentStep(4); // Was 4, now 4
     setInviteSent(false);
   };
 
   const handleContinueToGHL = () => {
-    setCurrentStep(5);
+    setCurrentStep(5); // Was 5, now 5
     setInviteSent(false);
   };
 
@@ -138,6 +139,126 @@ export default function CloserOnboarding() {
 
         {/* Step Content */}
         <AnimatePresence mode="wait">
+          {/* STEP 0: Instructions / Welcome */}
+          {currentStep === 0 && (
+            <motion.div
+              key="step0"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              transition={{ duration: 0.3 }}
+            >
+              <div className="bg-white border border-gray-200 rounded-2xl p-8 shadow-sm">
+                <div className="text-center mb-8">
+                  <div className="inline-flex items-center justify-center w-20 h-20 bg-blue-100 rounded-full mb-6">
+                    <Briefcase className="h-10 w-10 text-blue-600" />
+                  </div>
+                  <h2 className="text-3xl font-bold text-gray-900 mb-3">
+                    Welcome to TJR Sales Team
+                  </h2>
+                  <p className="text-gray-600 text-lg">
+                    Let's get you set up with all your tools and accounts
+                  </p>
+                </div>
+
+                <div className="space-y-6 mb-8">
+                  <div className="bg-gradient-to-r from-blue-50 to-blue-100 border border-blue-200 rounded-xl p-6">
+                    <div className="flex items-start gap-4">
+                      <div className="flex-shrink-0 w-12 h-12 bg-blue-600 rounded-xl flex items-center justify-center">
+                        <Mail className="h-6 w-6 text-white" />
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-bold text-gray-900 mb-2">
+                          Step 1: Google Workspace (@tjr-trades.com)
+                        </h3>
+                        <p className="text-gray-700 leading-relaxed">
+                          Your business email for <strong>all customer communication</strong>. This is NOT for personal use. 
+                          All calls and conversations with customers must go through this account.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-gradient-to-r from-indigo-50 to-indigo-100 border border-indigo-200 rounded-xl p-6">
+                    <div className="flex items-start gap-4">
+                      <div className="flex-shrink-0 w-12 h-12 bg-indigo-600 rounded-xl flex items-center justify-center">
+                        <Video className="h-6 w-6 text-white" />
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-bold text-gray-900 mb-2">
+                          Step 2: Zoom Meeting Account
+                        </h3>
+                        <p className="text-gray-700 leading-relaxed">
+                          Associated with your @tjr-trades.com account. You'll get personal + team meeting links for sales calls. 
+                          <strong className="text-red-700"> All calls are RECORDED</strong>. Sales calls ONLY - no personal use.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-gradient-to-r from-green-50 to-green-100 border border-green-200 rounded-xl p-6">
+                    <div className="flex items-start gap-4">
+                      <div className="flex-shrink-0 w-12 h-12 bg-green-600 rounded-xl flex items-center justify-center">
+                        <Calendar className="h-6 w-6 text-white" />
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-bold text-gray-900 mb-2">
+                          Step 3: Calendly Scheduling
+                        </h3>
+                        <p className="text-gray-700 leading-relaxed">
+                          Book and manage sales appointments. Integrated with your @tjr-trades.com calendar. 
+                          <strong> Sales use only</strong> - this is for customer-facing bookings.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-gradient-to-r from-purple-50 to-purple-100 border border-purple-200 rounded-xl p-6">
+                    <div className="flex items-start gap-4">
+                      <div className="flex-shrink-0 w-12 h-12 bg-purple-600 rounded-xl flex items-center justify-center">
+                        <Briefcase className="h-6 w-6 text-white" />
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-bold text-gray-900 mb-2">
+                          Step 4: GoHighLevel (GHL) CRM
+                        </h3>
+                        <p className="text-gray-700 leading-relaxed">
+                          Customer relationship management system. Track all leads and deals here. 
+                          You'll also get your <strong>650 area code sales number</strong> for making calls.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-8">
+                  <div className="flex items-start gap-3">
+                    <AlertCircle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-semibold text-amber-900 mb-1">
+                        Important Notes
+                      </p>
+                      <ul className="text-sm text-amber-800 space-y-1">
+                        <li>• All accounts are for <strong>business use only</strong></li>
+                        <li>• Your @tjr-trades.com email is your primary work identity</li>
+                        <li>• All customer interactions must happen through these platforms</li>
+                        <li>• Never share login credentials with anyone</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => setCurrentStep(1)}
+                  className="w-full btn-primary flex items-center justify-center gap-2 py-4 text-base"
+                >
+                  <span>Start Onboarding</span>
+                  <ArrowRight className="h-5 w-5" />
+                </button>
+              </div>
+            </motion.div>
+          )}
+
           {/* STEP 1: Initial Form */}
           {currentStep === 1 && (
             <motion.div

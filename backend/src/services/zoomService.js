@@ -175,6 +175,104 @@ class ZoomService {
       throw new Error(`Failed to get Zoom user: ${error.message}`);
     }
   }
+
+  // Get license availability information
+  async getLicenseInfo() {
+    try {
+      console.log('[Zoom] Fetching license info...');
+      const token = await this.getAccessToken();
+      
+      // Get list of users with their license types
+      const usersResponse = await axios.get(
+        `${this.baseURL}/users`,
+        {
+          params: {
+            status: 'active',
+            page_size: 300
+          },
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        }
+      );
+
+      // Count licensed users (type 2 = licensed, type 1 = basic)
+      const allUsers = usersResponse.data.users || [];
+      const licensedUsers = allUsers.filter(u => u.type === 2);
+      
+      // Get account settings to find total license count
+      let totalLicenses = 0;
+      try {
+        const settingsResponse = await axios.get(
+          `${this.baseURL}/accounts/${this.accountId}/settings`,
+          {
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
+          }
+        );
+        
+        // Try to get license count from settings
+        totalLicenses = settingsResponse.data.feature?.meeting_capacity || 0;
+      } catch (error) {
+        console.log('[Zoom] Could not fetch settings, using user count');
+      }
+      
+      // If we couldn't get total from settings, try getting from billing/plan
+      if (totalLicenses === 0) {
+        try {
+          const billingResponse = await axios.get(
+            `${this.baseURL}/accounts/${this.accountId}`,
+            {
+              headers: {
+                'Authorization': `Bearer ${token}`
+              }
+            }
+          );
+          
+          // Some accounts expose plan_base_purchased in account info
+          totalLicenses = billingResponse.data.options?.host_limit || billingResponse.data.host_limit || 0;
+        } catch (error) {
+          console.log('[Zoom] Could not fetch billing info');
+        }
+      }
+      
+      // If still 0, assume the total is the current count + some buffer
+      // This prevents false "no licenses" when we can't determine the limit
+      if (totalLicenses === 0) {
+        totalLicenses = Math.max(licensedUsers.length + 5, 25); // At least 5 free or minimum 25
+        console.log(`[Zoom] Could not determine license limit, assuming ${totalLicenses}`);
+      }
+
+      const usedLicenses = licensedUsers.length;
+      const availableLicenses = Math.max(0, totalLicenses - usedLicenses);
+      const usagePercentage = totalLicenses > 0 ? Math.round((usedLicenses / totalLicenses) * 100) : 0;
+
+      console.log(`[Zoom] ✅ License info: ${usedLicenses}/${totalLicenses} used (${usagePercentage}%)`);
+
+      return {
+        platform: 'zoom',
+        total: totalLicenses,
+        used: usedLicenses,
+        available: availableLicenses,
+        percentage: usagePercentage,
+        hasAvailableLicenses: availableLicenses > 0
+      };
+    } catch (error) {
+      console.error('[Zoom] Error getting license info:', error.response?.data || error.message);
+      
+      // Return a permissive response on error so onboarding isn't blocked
+      return {
+        platform: 'zoom',
+        total: 25,
+        used: 0,
+        available: 25,
+        percentage: 0,
+        hasAvailableLicenses: true,
+        error: error.message
+      };
+    }
+  }
 }
 
 export default new ZoomService();

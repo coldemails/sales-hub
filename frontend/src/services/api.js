@@ -63,6 +63,7 @@ export const analyticsApi = {
 // Closers API
 export const closersApi = {
   getClosers: () => api.get('/closers'),  // Gets all @tjr-trades.com users from GHL
+  getLicenses: () => api.get('/closers/licenses'),  // Get license availability
   onboardCloser: (data) => api.post('/closers/onboard', data),
   offboardCloser: (ghlUserId, platforms) => api.delete(`/closers/offboard/${ghlUserId}`, { data: { platforms } }),
   getPlatforms: (ghlUserId) => api.get(`/closers/${ghlUserId}/platforms`),
@@ -73,6 +74,7 @@ export const calendlyApi = {
   getUser: () => api.get('/calendly/user'),
   getOrganization: () => api.get('/calendly/organization'),
   getEventTypes: () => api.get('/calendly/event-types'),
+  getEventTypesWithTeamInfo: () => api.get('/calendly/event-types/with-team-info'),
   getScheduledEvents: (params = {}) => {
     const queryParams = new URLSearchParams();
     if (params.min_start_time) queryParams.append('min_start_time', params.min_start_time);

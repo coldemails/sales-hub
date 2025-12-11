@@ -7,6 +7,67 @@ import twilioService from '../services/twilioService.js';
 
 const router = express.Router();
 
+// GET /api/closers/licenses - Check license availability across all platforms
+router.get('/licenses', async (req, res) => {
+  try {
+    console.log('[Closers] Checking license availability...');
+    
+    const licenses = {
+      zoom: null,
+      calendly: null
+    };
+
+    // Check Zoom licenses
+    try {
+      licenses.zoom = await zoomService.getLicenseInfo();
+    } catch (error) {
+      console.error('[Closers] Error checking Zoom licenses:', error.message);
+      licenses.zoom = { 
+        platform: 'zoom', 
+        error: error.message, 
+        hasAvailableLicenses: false 
+      };
+    }
+
+    // Check Calendly licenses
+    try {
+      licenses.calendly = await calendlyService.getLicenseInfo();
+    } catch (error) {
+      console.error('[Closers] Error checking Calendly licenses:', error.message);
+      licenses.calendly = { 
+        platform: 'calendly', 
+        error: error.message, 
+        hasAvailableLicenses: false 
+      };
+    }
+
+    // Determine overall availability
+    const allAvailable = licenses.zoom?.hasAvailableLicenses && licenses.calendly?.hasAvailableLicenses;
+    const anyUnavailable = !licenses.zoom?.hasAvailableLicenses || !licenses.calendly?.hasAvailableLicenses;
+
+    res.json({
+      success: true,
+      canOnboard: allAvailable,
+      licenses: licenses,
+      summary: {
+        allAvailable: allAvailable,
+        anyUnavailable: anyUnavailable,
+        unavailablePlatforms: [
+          !licenses.zoom?.hasAvailableLicenses && 'Zoom',
+          !licenses.calendly?.hasAvailableLicenses && 'Calendly'
+        ].filter(Boolean)
+      }
+    });
+
+  } catch (error) {
+    console.error('[Closers] Error checking licenses:', error);
+    res.status(500).json({ 
+      success: false,
+      error: error.message 
+    });
+  }
+});
+
 // GET /api/closers - Get all closers from GHL (users with @tjr-trades.com)
 router.get('/', async (req, res) => {
   try {
@@ -97,13 +158,16 @@ router.post('/onboard', async (req, res) => {
   try {
     const { firstName, lastName, email, phoneNumber } = req.body;
 
-    if (!firstName || !lastName || !email) {
+    if (!firstName || !lastName) {
       return res.status(400).json({ 
-        error: 'First name, last name, and email are required' 
+        error: 'First name and last name are required' 
       });
     }
 
-    console.log(`[Closers] 🚀 Starting onboarding for ${firstName} ${lastName} (${email})`);
+    // Email is now optional - will be auto-generated if not provided
+    const workEmail = email || await googleWorkspaceService.generateEmail(firstName, lastName);
+
+    console.log(`[Closers] 🚀 Starting onboarding for ${firstName} ${lastName} (${workEmail})`);
 
     const progress = {
       googleWorkspace: { status: 'pending', data: null, error: null },
@@ -113,21 +177,21 @@ router.post('/onboard', async (req, res) => {
       ghl: { status: 'pending', data: null, error: null }
     };
 
-    // Step 1: Google Workspace
+    // Step 1: Google Workspace (now uses auto-generated email)
     try {
       console.log('[Closers] Step 1/5: Creating Google Workspace account...');
-      const gwResult = await googleWorkspaceService.createAccount(firstName, lastName, email);
-      progress.googleWorkspace = { status: 'success', data: gwResult, error: null };
+      const gwResult = await googleWorkspaceService.createAccount(firstName, lastName, workEmail);
+      progress.googleWorkspace = { status: 'success', data: { ...gwResult, email: workEmail }, error: null };
       console.log('[Closers] ✅ Google Workspace account created');
     } catch (error) {
       console.error('[Closers] ❌ Google Workspace failed:', error.message);
       progress.googleWorkspace = { status: 'failed', data: null, error: error.message };
     }
 
-    // Step 2: Calendly
+    // Step 2: Calendly (use generated work email)
     try {
       console.log('[Closers] Step 2/5: Sending Calendly invitation...');
-      const calendlyResult = await calendlyService.inviteUser(email, firstName, lastName);
+      const calendlyResult = await calendlyService.inviteUser(workEmail, firstName, lastName);
       progress.calendly = { status: 'success', data: calendlyResult, error: null };
       console.log('[Closers] ✅ Calendly invitation sent');
     } catch (error) {
@@ -135,10 +199,10 @@ router.post('/onboard', async (req, res) => {
       progress.calendly = { status: 'failed', data: null, error: error.message };
     }
 
-    // Step 3: Zoom
+    // Step 3: Zoom (use generated work email)
     try {
       console.log('[Closers] Step 3/5: Creating Zoom account...');
-      const zoomResult = await zoomService.createUser(firstName, lastName, email);
+      const zoomResult = await zoomService.createUser(firstName, lastName, workEmail);
       progress.zoom = { status: 'success', data: zoomResult, error: null, note: 'May require manual license assignment' };
       console.log('[Closers] ✅ Zoom account created');
     } catch (error) {
@@ -177,7 +241,7 @@ router.post('/onboard', async (req, res) => {
       console.log('[Closers] Step 5/5: Adding to GHL...');
       const ghlResult = {
         userId: `ghl_${Date.now()}`,
-        email: email,
+        email: workEmail,
         status: 'invited',
         message: '⚠️ DUMMY MODE: GHL invitation simulated'
       };
@@ -193,6 +257,7 @@ router.post('/onboard', async (req, res) => {
     res.json({
       success: true,
       message: 'Closer onboarding completed successfully',
+      generatedEmail: workEmail,
       progress,
       summary: {
         total: 5,

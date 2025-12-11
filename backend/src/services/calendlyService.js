@@ -112,6 +112,55 @@ export async function getEventTypeDetails(eventTypeUri) {
   }
 }
 
+// Get event types with team classification
+export async function getEventTypesWithTeamInfo() {
+  try {
+    console.log('[Calendly] Fetching all event types with team info...');
+    const eventTypes = await getEventTypes();
+    
+    const enrichedEventTypes = await Promise.all(
+      eventTypes.map(async (eventType) => {
+        try {
+          // Fetch full details to get host count and scheduling_url
+          const details = await getEventTypeDetails(eventType.uri);
+          
+          // Determine if it's a team event based on pooling type or host count
+          const isTeamEvent = details.pooling_type === 'round_robin' || 
+                              details.pooling_type === 'collective' ||
+                              (details.profile?.type === 'Team' || details.type === 'Team');
+          
+          return {
+            uri: eventType.uri,
+            name: eventType.name,
+            scheduling_url: eventType.scheduling_url || details.scheduling_url,
+            active: eventType.active,
+            type: eventType.type,
+            pooling_type: details.pooling_type,
+            isTeamEvent: isTeamEvent,
+            slug: eventType.slug,
+            duration: eventType.duration
+          };
+        } catch (error) {
+          console.error(`[Calendly] Error enriching event type ${eventType.name}:`, error.message);
+          return {
+            uri: eventType.uri,
+            name: eventType.name,
+            scheduling_url: eventType.scheduling_url,
+            active: eventType.active,
+            isTeamEvent: false // Default to personal if error
+          };
+        }
+      })
+    );
+    
+    console.log(`[Calendly] ✅ Enriched ${enrichedEventTypes.length} event types`);
+    return enrichedEventTypes;
+  } catch (error) {
+    console.error('[Calendly] Error fetching event types with team info:', error.message);
+    throw error;
+  }
+}
+
 // Get organization members (your team)
 export async function getOrganizationMembers() {
   try {
@@ -205,5 +254,47 @@ export async function removeUser(email) {
   } catch (error) {
     console.error('[Calendly] Error removing user:', error.response?.data || error.message);
     throw new Error(`Failed to remove Calendly user: ${error.response?.data?.message || error.message}`);
+  }
+}
+
+// Get license availability information
+export async function getLicenseInfo() {
+  try {
+    console.log('[Calendly] Fetching license info...');
+    
+    // Get organization info for plan limits
+    const org = await getOrganization();
+    
+    // Get all members to count usage
+    const members = await getOrganizationMembers();
+    
+    // Calendly doesn't expose max seats via API directly
+    // We need to check the organization object for seat info
+    // For now, we'll count active members and assume some buffer
+    const activeMembers = members.filter(m => m.role !== 'owner').length; // Exclude owner from count
+    
+    // Try to get actual seat limit from org metadata if available
+    // Most Calendly plans: Teams (12-20), Professional (6), Enterprise (custom)
+    // If we can't determine, use a high number to avoid false "no license" errors
+    const totalLicenses = org.total_seats || org.max_users || 25; // Default to 25 if unknown
+    
+    const usedLicenses = activeMembers;
+    const availableLicenses = Math.max(0, totalLicenses - usedLicenses);
+    const usagePercentage = totalLicenses > 0 ? Math.round((usedLicenses / totalLicenses) * 100) : 0;
+    
+    console.log(`[Calendly] ✅ License info: ${usedLicenses}/${totalLicenses} used (${usagePercentage}%)`);
+    
+    return {
+      platform: 'calendly',
+      total: totalLicenses,
+      used: usedLicenses,
+      available: availableLicenses,
+      percentage: usagePercentage,
+      hasAvailableLicenses: availableLicenses > 0,
+      planName: org.plan || 'unknown'
+    };
+  } catch (error) {
+    console.error('[Calendly] Error getting license info:', error.response?.data || error.message);
+    throw new Error(`Failed to get Calendly license info: ${error.message}`);
   }
 }

@@ -39,6 +39,23 @@ router.get('/event-types', async (req, res) => {
   }
 });
 
+// Get event types with team classification
+router.get('/event-types/with-team-info', async (req, res) => {
+  try {
+    console.log('[Calendly API] Fetching event types with team info...');
+    const eventTypes = await calendlyService.getEventTypesWithTeamInfo();
+    res.json({ 
+      eventTypes,
+      count: eventTypes.length,
+      teamCount: eventTypes.filter(et => et.isTeamEvent).length,
+      personalCount: eventTypes.filter(et => !et.isTeamEvent).length
+    });
+  } catch (error) {
+    console.error('[Calendly API] Error fetching event types with team info:', error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Get event type details by URI
 router.get('/event-type-details', async (req, res) => {
   try {

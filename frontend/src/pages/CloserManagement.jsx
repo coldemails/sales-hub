@@ -50,8 +50,26 @@ export default function CloserManagement() {
     refetchInterval: 10000
   });
 
+  // Fetch license availability
+  const { data: licensesData, isLoading: licensesLoading, error: licensesError } = useQuery({
+    queryKey: ['licenses'],
+    queryFn: async () => {
+      const response = await closersApi.getLicenses();
+      return response.data;
+    },
+    refetchInterval: 30000, // Check every 30 seconds
+    retry: 2
+  });
+
   const closers = closersData?.closers || [];
   const closersWithNumbers = closers.filter(c => c.assignedPhoneNumber);
+  const licenses = licensesData?.licenses || {};
+  const canOnboard = licensesData?.canOnboard ?? true; // Default to true if loading or error
+  
+  // Log for debugging
+  console.log('[CloserManagement] License data:', licensesData);
+  console.log('[CloserManagement] Can onboard:', canOnboard);
+  console.log('[CloserManagement] Licenses error:', licensesError);
 
   // Onboard mutation
   const onboardMutation = useMutation({
@@ -187,16 +205,91 @@ export default function CloserManagement() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Closer Management</h1>
-          <p className="text-gray-600 mt-1">Onboard and manage closers across all platforms</p>
+          <div className="flex items-center gap-3 mt-2">
+            <p className="text-gray-600">Onboard and manage closers across all platforms</p>
+            
+            {/* License Status Indicator */}
+            {licensesData && !licensesLoading && licenses && (
+              <div className="flex items-center gap-2">
+                {/* Zoom License */}
+                {licenses.zoom && !licenses.zoom.error && (
+                  <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${
+                    licenses.zoom.percentage >= 95 
+                      ? 'bg-red-50 text-red-700' 
+                      : licenses.zoom.percentage >= 90 
+                      ? 'bg-orange-50 text-orange-700' 
+                      : 'bg-green-50 text-green-700'
+                  }`}>
+                    <span className={`h-1.5 w-1.5 rounded-full ${
+                      licenses.zoom.percentage >= 95 
+                        ? 'bg-red-500' 
+                        : licenses.zoom.percentage >= 90 
+                        ? 'bg-orange-500' 
+                        : 'bg-green-500'
+                    }`}></span>
+                    Zoom: {licenses.zoom.used}/{licenses.zoom.total}
+                  </div>
+                )}
+
+                {/* Calendly License */}
+                {licenses.calendly && !licenses.calendly.error && (
+                  <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${
+                    licenses.calendly.percentage >= 95 
+                      ? 'bg-red-50 text-red-700' 
+                      : licenses.calendly.percentage >= 90 
+                      ? 'bg-orange-50 text-orange-700' 
+                      : 'bg-green-50 text-green-700'
+                  }`}>
+                    <span className={`h-1.5 w-1.5 rounded-full ${
+                      licenses.calendly.percentage >= 95 
+                        ? 'bg-red-500' 
+                        : licenses.calendly.percentage >= 90 
+                        ? 'bg-orange-500' 
+                        : 'bg-green-500'
+                    }`}></span>
+                    Calendly: {licenses.calendly.used}/{licenses.calendly.total}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
         <button
-          onClick={() => setShowOnboardForm(!showOnboardForm)}
-          className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors"
+          onClick={() => canOnboard && setShowOnboardForm(!showOnboardForm)}
+          disabled={!canOnboard}
+          className={`flex items-center gap-2 px-4 py-2.5 font-medium rounded-lg transition-colors ${
+            canOnboard 
+              ? 'bg-blue-600 hover:bg-blue-700 text-white cursor-pointer' 
+              : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+          }`}
+          title={!canOnboard ? 'No licenses available. Notify Sales Manager to purchase licenses.' : ''}
         >
           <UserPlus className="h-5 w-5" />
           <span>Onboard New Closer</span>
         </button>
       </div>
+
+      {/* License Warning */}
+      {licensesData && !canOnboard && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-red-50 border border-red-200 rounded-xl p-4"
+        >
+          <div className="flex items-start gap-3">
+            <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-semibold text-red-900 mb-1">
+                No Licenses Available
+              </p>
+              <p className="text-sm text-red-800">
+                {licensesData?.summary?.unavailablePlatforms?.join(' and ')} license{licensesData?.summary?.unavailablePlatforms?.length > 1 ? 's are' : ' is'} full. 
+                Please notify your Sales Manager to purchase additional licenses before onboarding new closers.
+              </p>
+            </div>
+          </div>
+        </motion.div>
+      )}
 
       {/* Stats Overview */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

@@ -24,7 +24,6 @@ export default function CallsManagement() {
   const [customEndDate, setCustomEndDate] = useState('');
   const [showCustomPicker, setShowCustomPicker] = useState(false);
   const [showAllClosers, setShowAllClosers] = useState(false);
-  const [eventTypeUrls, setEventTypeUrls] = useState({});
 
   // Calculate date ranges
   const getDateRange = () => {
@@ -92,6 +91,17 @@ export default function CallsManagement() {
     refetchInterval: 30000
   });
 
+  // Fetch event types with team classification
+  const { data: eventTypesData, isLoading: eventTypesLoading } = useQuery({
+    queryKey: ['calendly-event-types-team'],
+    queryFn: async () => {
+      const response = await calendlyApi.getEventTypesWithTeamInfo();
+      return response.data;
+    },
+    refetchInterval: 300000, // 5 minutes - event types don't change often
+    staleTime: 240000 // 4 minutes
+  });
+
   // Fetch Calendly events
   const { data: calendlyEventsData, isLoading: eventsLoading } = useQuery({
     queryKey: ['calendly-events', selectedDateFilter, customStartDate, customEndDate],
@@ -110,6 +120,18 @@ export default function CallsManagement() {
 
   const closers = closersData?.closers || [];
   const allEvents = calendlyEventsData?.events || [];
+  const eventTypesInfo = eventTypesData?.eventTypes || [];
+
+  // Create event type lookup map for URLs and team classification
+  const eventTypeMap = eventTypesInfo.reduce((acc, et) => {
+    acc[et.uri] = {
+      name: et.name,
+      scheduling_url: et.scheduling_url,
+      isTeamEvent: et.isTeamEvent,
+      pooling_type: et.pooling_type
+    };
+    return acc;
+  }, {});
 
   // Calculate stats
   const closersWithNumbers = closers.filter(c => c.assignedPhoneNumber);
@@ -146,14 +168,48 @@ export default function CallsManagement() {
   const displayClosers = showAllClosers ? sortedClosers : sortedClosers.slice(0, 8);
   const hiddenCount = sortedClosers.length - 8;
 
-  // Event Type Breakdown - GROUP BY EVENT TYPE URI, FILTER 2+ closers
+  // Helper to get clean booking URL from scheduling_url
+  const getCleanSchedulingUrl = (scheduling_url) => {
+    if (!scheduling_url) return null;
+    try {
+      const url = new URL(scheduling_url);
+      return url.hostname + url.pathname; // Returns like "calendly.com/team/event-name"
+    } catch {
+      return scheduling_url; // Return as-is if URL parsing fails
+    }
+  };
+
+  // Helper to detect if event is personal based on name pattern
+  const isPersonalEvent = (eventName) => {
+    if (!eventName) return false;
+    
+    // Pattern: Contains (Name) or (First Last) with at least 3+ characters
+    // Examples: "(Ben)", "(Daniel Palacio)", "(Jordan G)", "(Alex)", "(Tristan)"
+    // NOT: "(N)" which is too short to be a name
+    const nameInParenthesesPattern = /\([A-Z][a-z]{2,}[^)]*\)/;
+    
+    return nameInParenthesesPattern.test(eventName);
+  };
+
+  // Event Type Breakdown - FILTER BY ACTUAL TEAM EVENTS FROM API
   const eventTypeBreakdown = allEvents.reduce((acc, event) => {
     const eventTypeUri = event.event_type || 'unknown';
     const eventTypeName = event.name || 'Unknown Event';
     const memberCount = event.event_memberships?.length || 0;
     
-    // FILTER: Only include events with 2+ members (team events)
-    if (memberCount < 2) {
+    // FILTER 1: Exclude personal events by name pattern
+    // Personal events have names like: "Onboarding Call (Ben)", "Onboarding Call (Daniel Palacio)"
+    // Keep team events like: "Profit Strategy Call (N)" where (N) is too short to be a personal name
+    if (isPersonalEvent(eventTypeName)) {
+      return acc;
+    }
+    
+    // Check if this event type is a team event from our API data
+    const eventTypeInfo = eventTypeMap[eventTypeUri];
+    const isTeamEvent = eventTypeInfo?.isTeamEvent || memberCount >= 2; // Fallback to member count
+    
+    // FILTER 2: Only include team events
+    if (!isTeamEvent) {
       return acc;
     }
     
@@ -161,6 +217,8 @@ export default function CallsManagement() {
       acc[eventTypeUri] = {
         name: eventTypeName,
         eventTypeUri: eventTypeUri,
+        scheduling_url: eventTypeInfo?.scheduling_url || null,
+        pooling_type: eventTypeInfo?.pooling_type || null,
         count: 0,
         closers: new Set(),
         memberCount: memberCount
@@ -189,39 +247,7 @@ export default function CallsManagement() {
   const activeEventTypes = eventTypeStats.length;
   const totalTeamCalls = eventTypeStats.reduce((sum, et) => sum + et.count, 0);
 
-  // Fetch event type URLs when event stats change
-  useEffect(() => {
-    const fetchEventTypeUrls = async () => {
-      if (eventTypeStats.length === 0 || eventsLoading) return;
-      
-      console.log('[CallsManagement] Fetching URLs for', eventTypeStats.length, 'event types');
-      const urls = {};
-      
-      for (const eventType of eventTypeStats) {
-        try {
-          const response = await calendlyApi.getEventTypeDetails(eventType.eventTypeUri);
-          const schedulingUrl = response.data.eventType.scheduling_url;
-          // Extract clean URL: calendly.com/tjr-trades/event-slug
-          const cleanUrl = schedulingUrl.replace('https://', '');
-          urls[eventType.eventTypeUri] = cleanUrl;
-          console.log(`[CallsManagement] ✅ ${eventType.name}: ${cleanUrl}`);
-        } catch (error) {
-          console.error(`[CallsManagement] Error fetching URL for ${eventType.name}:`, error);
-          urls[eventType.eventTypeUri] = 'URL unavailable';
-        }
-      }
-      
-      setEventTypeUrls(urls);
-    };
-    
-    fetchEventTypeUrls();
-  }, [eventTypeStats.length, eventsLoading]);
-
-  const getCleanEventUrl = (eventTypeUri) => {
-    return eventTypeUrls[eventTypeUri] || 'Loading...';
-  };
-
-  const isLoading = closersLoading || eventsLoading;
+  const isLoading = closersLoading || eventsLoading || eventTypesLoading;
 
   const dateFilters = [
     { id: 'today', label: 'Today' },
@@ -657,7 +683,7 @@ export default function CallsManagement() {
                     Team Events Only
                   </p>
                   <p className="text-sm text-blue-800">
-                    Showing only events with 2+ closers assigned (Round Robin team events). Individual closer events are excluded.
+                    Showing only team events (Round Robin/Collective). Personal closer events like "Onboarding Call (Ben)" are automatically excluded.
                   </p>
                 </div>
               </div>
@@ -705,9 +731,20 @@ export default function CallsManagement() {
                               <h3 className="font-bold text-gray-900 text-base mb-1">
                                 {eventType.name}
                               </h3>
-                              <p className="text-xs text-gray-500 font-mono break-all">
-                                {getCleanEventUrl(eventType.eventTypeUri)}
-                              </p>
+                              {eventType.scheduling_url ? (
+                                <a
+                                  href={eventType.scheduling_url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-xs text-blue-600 hover:text-blue-800 font-mono break-all hover:underline"
+                                >
+                                  {getCleanSchedulingUrl(eventType.scheduling_url)}
+                                </a>
+                              ) : (
+                                <p className="text-xs text-gray-400 font-mono">
+                                  URL not available
+                                </p>
+                              )}
                             </div>
                           </div>
                           {/* Closers */}
